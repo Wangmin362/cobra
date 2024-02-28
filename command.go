@@ -885,6 +885,7 @@ func (c *Command) execute(a []string) (err error) {
 	c.InitDefaultHelpFlag()
 	c.InitDefaultVersionFlag()
 
+	// 解析参数
 	err = c.ParseFlags(a)
 	if err != nil {
 		return c.FlagErrorFunc()(c, err)
@@ -892,6 +893,7 @@ func (c *Command) execute(a []string) (err error) {
 
 	// If help is called, regardless of other flags, return we want help.
 	// Also say we need help if the command isn't runnable.
+	// 检查help子命令是否使用正确，这是一个布尔值
 	helpVal, err := c.Flags().GetBool("help")
 	if err != nil {
 		// should be impossible to get here as we always declare a help
@@ -900,6 +902,7 @@ func (c *Command) execute(a []string) (err error) {
 		return err
 	}
 
+	// 如果有help子命令，那么打印描述信息
 	if helpVal {
 		return flag.ErrHelp
 	}
@@ -920,12 +923,16 @@ func (c *Command) execute(a []string) (err error) {
 		}
 	}
 
+	// 用于判断当前命令是否能够执行，很多情况下一个命令必须要配合子命令才可以执行，此时直接执行命令是无效的，因此不能执行。
+	// 这种情况下Cobra会自动提示命令的帮助信息
 	if !c.Runnable() {
 		return flag.ErrHelp
 	}
 
+	// 执行Cobra全局Hook，遗憾的是这个hook并没有传入相关的命令信息，通过cobra.OnFinalize设置
 	c.preRun()
 
+	// 执行Cobra全局Hook，遗憾的是这个hook并没有传入相关的命令信息，通过cobra.OnFinalize设置
 	defer c.postRun()
 
 	argWoFlags := c.Flags().Args()
@@ -937,6 +944,7 @@ func (c *Command) execute(a []string) (err error) {
 		return err
 	}
 
+	// TODO 这里在干嘛
 	parents := make([]*Command, 0, 5)
 	for p := c; p != nil; p = p.Parent() {
 		if EnableTraverseRunHooks {
@@ -964,6 +972,8 @@ func (c *Command) execute(a []string) (err error) {
 			}
 		}
 	}
+
+	// 从这里可以看出，Run, RunE只能二选一；如果同时设置RunE的优先级更高
 	if c.PreRunE != nil {
 		if err := c.PreRunE(c, argWoFlags); err != nil {
 			return err
@@ -1013,6 +1023,8 @@ func (c *Command) execute(a []string) (err error) {
 }
 
 func (c *Command) preRun() {
+	// 这里设计的不合理鸭，用户传入的回调根本获取不到命令相关的信息
+	// TODO 难道还有另外一种回调？
 	for _, x := range initializers {
 		x()
 	}
@@ -1055,7 +1067,9 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 	}
 
 	// Regardless of what command execute is called on, run on Root only
+	// 显然，如果通过AddCommand函数设置了子命令，那么子命令一定会设置parent
 	if c.HasParent() {
+		// TODO 为什么这里需要递归查找根命令？
 		return c.Root().ExecuteC()
 	}
 
@@ -1065,12 +1079,15 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 	}
 
 	// initialize help at the last point to allow for user overriding
+	// 帮助命令，可以通过cmd.SetHelpCommand()函数覆盖
 	c.InitDefaultHelpCmd()
 	// initialize completion at the last point to allow for user overriding
+	// TODO 应该是命令补全相关，暂时不管
 	c.InitDefaultCompletionCmd()
 
 	// Now that all commands have been created, let's make sure all groups
 	// are properly created also
+	// TODO 命令的组有啥用？ Cobra是如何定义命令组的？
 	c.checkCommandGroups()
 
 	args := c.args
@@ -1081,12 +1098,15 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 	}
 
 	// initialize the hidden command to be used for shell completion
+	// 命令不全
 	c.initCompleteCmd(args)
 
 	var flags []string
+	// TODO 这玩意干嘛的？
 	if c.TraverseChildren {
 		cmd, flags, err = c.Traverse(args)
 	} else {
+		// TODO 这里在干嘛？
 		cmd, flags, err = c.Find(args)
 	}
 	if err != nil {
@@ -1112,6 +1132,7 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 		cmd.ctx = c.ctx
 	}
 
+	// 执行命令，核心在这里
 	err = cmd.execute(flags)
 	if err != nil {
 		// Always show help if requested, even if SilenceErrors is in
