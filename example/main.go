@@ -20,6 +20,14 @@ var rootCmd = &cobra.Command{
 		cmd.HelpFunc()(cmd, args)
 		return nil
 	},
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Println("PersistentPreRunE call..")
+		return nil
+	},
+	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Println("PersistentPostRunE call..")
+		return nil
+	},
 	CompletionOptions: cobra.CompletionOptions{
 		DisableDefaultCmd: true, // 是否禁用命令补全命令
 	},
